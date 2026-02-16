@@ -20,6 +20,17 @@ export default {
       .setLabel('Verify')
       .setStyle(ButtonStyle.Success);
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(button);
+    // Post the verification panel. Use fetchReply to obtain the message so we
+    // can pin it afterwards. Pinning ensures that new members can easily
+    // locate the verification button when they join the server.
     await interaction.reply({ embeds: [embed], components: [row] });
+    try {
+      const message = await interaction.fetchReply();
+      if (message && 'pin' in message && typeof (message as any).pin === 'function') {
+        await (message as any).pin();
+      }
+    } catch (err) {
+      console.warn('Failed to pin verification message:', err);
+    }
   },
 };

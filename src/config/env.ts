@@ -77,4 +77,72 @@ export class Env {
     if (Number.isNaN(volume) || volume < 0 || volume > 100) return 50;
     return volume;
   }
+
+  /**
+   * OAuth2 client ID used for authorising users to join the guild via the
+   * `guilds.join` scope. Must be set if you enable the join commands.
+   */
+  static get oauthClientId(): string {
+    const id = process.env.OAUTH_CLIENT_ID;
+    if (!id) throw new Error('OAUTH_CLIENT_ID is not set');
+    return id;
+  }
+
+  /**
+   * OAuth2 client secret used when exchanging authorization codes for tokens.
+   */
+  static get oauthClientSecret(): string {
+    const secret = process.env.OAUTH_CLIENT_SECRET;
+    if (!secret) throw new Error('OAUTH_CLIENT_SECRET is not set');
+    return secret;
+  }
+
+  /**
+   * Redirect URI registered for your OAuth2 application. Users are redirected
+   * here after authorising with Discord. Must exactly match the URI on the
+   * application settings page.
+   */
+  static get oauthRedirectUri(): string {
+    const uri = process.env.OAUTH_REDIRECT_URI;
+    if (!uri) throw new Error('OAUTH_REDIRECT_URI is not set');
+    return uri;
+  }
+
+  /**
+   * Guild ID to which authorised users should be added. Your bot must already
+   * be a member of this guild and have sufficient permissions (e.g. Manage
+   * Guild) to add new members via the API.
+   */
+  static get targetGuildId(): string {
+    const id = process.env.TARGET_GUILD_ID;
+    if (!id) throw new Error('TARGET_GUILD_ID is not set');
+    return id;
+  }
+
+  /**
+   * Identifier of the channel where administrators can post announcement drafts.
+   * Messages in this channel will be mirrored by the bot into the public
+   * announcement channel defined below. This must be set to a valid
+   * channel ID.
+   */
+  static get announcementSourceChannelId(): string {
+    const id = process.env.ANNOUNCEMENT_SOURCE_CHANNEL_ID;
+    if (!id) {
+      throw new Error('ANNOUNCEMENT_SOURCE_CHANNEL_ID is not set');
+    }
+    return id;
+  }
+
+  /**
+   * Identifier of the public announcements channel. The bot will repost
+   * messages from the announcement source channel into this channel under
+   * its own identity to conceal the original author. Must be set.
+   */
+  static get announcementChannelId(): string {
+    const id = process.env.ANNOUNCEMENT_CHANNEL_ID;
+    if (!id) {
+      throw new Error('ANNOUNCEMENT_CHANNEL_ID is not set');
+    }
+    return id;
+  }
 }

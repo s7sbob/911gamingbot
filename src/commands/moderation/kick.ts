@@ -38,7 +38,7 @@ export default {
       await logger.send(embed);
     } catch (error) {
       console.error(error);
-      await interaction.reply({ content: 'Failed to kick the member. Check my permissions.', ephermal: true });
+      await interaction.reply({ content: 'Failed to kick the member. Check my permissions.', ephemeral: true });
     }
   },
 };

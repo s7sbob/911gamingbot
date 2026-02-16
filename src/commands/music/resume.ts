@@ -5,19 +5,19 @@ export default {
   async execute(interaction: ChatInputCommandInteraction) {
     const guildId = interaction.guildId;
     if (!guildId) {
-      await interaction.reply({ content: 'This command can only be used in a guild.', ephermal: true });
+      await interaction.reply({ content: 'This command can only be used in a guild.', ephemeral: true });
       return;
     }
-    const queue = interaction.client.musicQueues.get(guildId);
+    const queue = (interaction.client as any).musicQueues?.get(guildId);
     if (!queue) {
-      await interaction.reply({ content: 'There is nothing to resume.', ephermal: true });
+      await interaction.reply({ content: 'There is nothing to resume.', ephemeral: true });
       return;
     }
     const resumed = queue.resume();
     if (resumed) {
       await interaction.reply({ content: 'Resumed playback.' });
     } else {
-      await interaction.reply({ content: 'Failed to resume. Are you sure it is paused?', ephermal: true });
+      await interaction.reply({ content: 'Failed to resume. Are you sure it is paused?', ephemeral: true });
     }
   },
 };

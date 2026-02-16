@@ -5,6 +5,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ChannelType,
 } from 'discord.js';
 import { Env } from '../config/env';
 
@@ -54,7 +55,6 @@ export default {
       const row = new ActionRowBuilder<ButtonBuilder>().addComponents(button);
       await interaction.reply({ embeds: [embed], components: [row] });
     } else if (sub === 'create') {
-      // Use the same logic as button open-ticket but triggered by command
       const guild = interaction.guild;
       const categoryId = Env.ticketCategoryId;
       const supportRoleId = Env.supportRoleId;
@@ -69,29 +69,28 @@ export default {
       try {
         const ticketChannel = await guild.channels.create({
           name: channelName,
-          type: 0,
+          type: ChannelType.GuildText,
           parent: categoryId,
           topic: `Ticket for ${interaction.user.tag} (${interaction.user.id})`,
           permissionOverwrites: [
             {
               id: guild.roles.everyone.id,
-              deny: ['ViewChannel'],
+              deny: [PermissionFlagsBits.ViewChannel],
             },
             {
               id: interaction.user.id,
-              allow: ['ViewChannel', 'SendMessages', 'AttachFiles', 'EmbedLinks'],
+              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.EmbedLinks],
             },
             ...(supportRoleId
               ? [
                   {
                     id: supportRoleId,
-                    allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'ManageMessages'],
+                    allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages],
                   },
                 ]
               : []),
           ],
         });
-        // Send initial message
         await ticketChannel.send({
           embeds: [
             {

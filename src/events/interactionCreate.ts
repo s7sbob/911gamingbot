@@ -1,4 +1,4 @@
-import { Events, Interaction, ButtonInteraction, ChatInputCommandInteraction, GuildMemberRoleManager } from 'discord.js';
+import { Events, Interaction, ButtonInteraction, ChatInputCommandInteraction, GuildMemberRoleManager, ChannelType, PermissionFlagsBits } from 'discord.js';
 import { Env } from '../config/env';
 import * as discordTranscripts from 'discord-html-transcripts';
 
@@ -24,7 +24,6 @@ export default {
     } else if (interaction.isButton()) {
       const customId = interaction.customId;
       if (customId === 'verify-button') {
-        // Assign verification role
         const guild = interaction.guild;
         if (!guild) return;
         const roleId = Env.verificationRoleId;
@@ -36,45 +35,41 @@ export default {
           await interaction.reply({ content: 'You are already verified.', ephemeral: true });
         }
       } else if (customId.startsWith('close-ticket')) {
-        // Closing ticket: generate transcript and delete channel
         const channel = interaction.channel;
         const guild = interaction.guild;
         if (!channel || !guild || !channel.isTextBased()) {
           return;
         }
-        await interaction.reply({ content: 'Closing ticket... please wait.', embeds: [], components: [], ephermal: true }).catch(() => {});
+        await interaction.reply({ content: 'Closing ticket... please wait.', ephemeral: true }).catch(() => {});
         try {
-          // Generate transcript
           const attachment = await discordTranscripts.createTranscript(channel, {
             limit: -1,
-            returnType: 'attachment',
-            filename: `${channel.name}.html`,
+            returnType: 'buffer' as any,
+            filename: `${'name' in channel ? channel.name : 'ticket'}.html`,
             poweredBy: false,
           });
-          // Send to transcript channel
           const transcriptChannel = await client.channels.fetch(Env.transcriptChannelId);
-          if (transcriptChannel && transcriptChannel.isTextBased()) {
-            await transcriptChannel.send({ content: `Transcript for ${channel.name}`, files: [attachment] });
+          if (transcriptChannel && transcriptChannel.isTextBased() && 'send' in transcriptChannel) {
+            await transcriptChannel.send({ 
+              content: `Transcript for ${'name' in channel ? channel.name : 'ticket'}`, 
+              files: [{ attachment, name: `${'name' in channel ? channel.name : 'ticket'}.html` }] 
+            });
           }
-          await interaction.editReply({ content: 'Ticket closed. Transcript saved.', components: [] }).catch(() => {});
+          await interaction.editReply({ content: 'Ticket closed. Transcript saved.' }).catch(() => {});
         } catch (err) {
           console.error('Failed to generate transcript:', err);
           try {
-            await interaction.editReply({ content: 'Ticket closed but failed to generate transcript.', components: [] });
+            await interaction.editReply({ content: 'Ticket closed but failed to generate transcript.' });
           } catch {}
         }
-        // Delete the channel after a short delay to allow the message to send
         setTimeout(() => {
           channel.delete().catch(() => {});
         }, 3000);
-      }
-      // Handle opening a new ticket via the ticket panel
-      else if (customId === 'open-ticket') {
+      } else if (customId === 'open-ticket') {
         const guild = interaction.guild;
         if (!guild) return;
         const categoryId = Env.ticketCategoryId;
         const supportRoleId = Env.supportRoleId;
-        // Check if user already has a ticket open by searching for a channel with their id in topic or permission.
         const existing = guild.channels.cache.find((c) => c.name.includes(interaction.user.id) && c.parentId === categoryId);
         if (existing) {
           await interaction.reply({ content: 'You already have an open ticket.', ephemeral: true });
@@ -84,29 +79,28 @@ export default {
         try {
           const ticketChannel = await guild.channels.create({
             name: channelName,
-            type: 0, // GuildText
+            type: ChannelType.GuildText,
             parent: categoryId,
             topic: `Ticket for ${interaction.user.tag} (${interaction.user.id})`,
             permissionOverwrites: [
               {
                 id: guild.roles.everyone.id,
-                deny: ['ViewChannel'],
+                deny: [PermissionFlagsBits.ViewChannel],
               },
               {
                 id: interaction.user.id,
-                allow: ['ViewChannel', 'SendMessages', 'AttachFiles', 'EmbedLinks'],
+                allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.EmbedLinks],
               },
               ...(supportRoleId
                 ? [
                     {
                       id: supportRoleId,
-                      allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'ManageMessages'],
+                      allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages],
                     },
                   ]
                 : []),
             ],
           });
-          // Send initial message in ticket with close button
           await ticketChannel.send({
             embeds: [
               {
@@ -122,7 +116,7 @@ export default {
                 components: [
                   {
                     type: 2,
-                    style: 4, // Danger
+                    style: 4,
                     label: 'Close Ticket',
                     custom_id: `close-ticket-${interaction.id}`,
                   },

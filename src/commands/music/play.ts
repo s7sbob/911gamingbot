@@ -14,27 +14,31 @@ export default {
     ),
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.guild || !interaction.guildId) {
-      await interaction.reply({ content: 'This command can only be used in a guild.', ephermal: true });
+      await interaction.reply({ content: 'This command can only be used in a guild.', ephemeral: true });
       return;
     }
     const member = interaction.guild.members.cache.get(interaction.user.id);
     if (!member || !member.voice.channel) {
-      await interaction.reply({ content: 'You must be in a voice channel to use this command.', ephermal: true });
+      await interaction.reply({ content: 'You must be in a voice channel to use this command.', ephemeral: true });
       return;
     }
     const query = interaction.options.getString('query', true);
-    // Get or create queue for this guild
-    let queue: MusicQueue = interaction.client.musicQueues.get(interaction.guildId);
+    
+    const client = interaction.client as any;
+    if (!client.musicQueues) {
+      client.musicQueues = new Map();
+    }
+    let queue: MusicQueue = client.musicQueues.get(interaction.guildId);
     if (!queue) {
       queue = new MusicQueue(interaction.guild, Env.musicVolume);
-      interaction.client.musicQueues.set(interaction.guildId, queue);
+      client.musicQueues.set(interaction.guildId, queue);
     }
-    // Connect to voice channel if not already
+    
     try {
       await queue.connect(member.voice.channel);
     } catch (error) {
       console.error(error);
-      await interaction.reply({ content: 'Failed to join your voice channel.', ephermal: true });
+      await interaction.reply({ content: 'Failed to join your voice channel.', ephemeral: true });
       return;
     }
     await interaction.deferReply();

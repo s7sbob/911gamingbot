@@ -16,13 +16,13 @@ export default {
     ),
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.guild) {
-      await interaction.reply({ content: 'This command can only be used in a guild.', ephermal: true });
+      await interaction.reply({ content: 'This command can only be used in a guild.', ephemeral: true });
       return;
     }
     const user = interaction.options.getUser('user', true);
     const member = await interaction.guild.members.fetch(user.id).catch(() => null);
     if (!member) {
-      await interaction.reply({ content: 'Member not found.', ephermal: true });
+      await interaction.reply({ content: 'Member not found.', ephemeral: true });
       return;
     }
     try {
@@ -33,7 +33,7 @@ export default {
       await logger.send(embed);
     } catch (error) {
       console.error(error);
-      await interaction.reply({ content: 'Failed to unmute the member. Check my permissions.', ephermal: true });
+      await interaction.reply({ content: 'Failed to unmute the member. Check my permissions.', ephemeral: true });
     }
   },
 };

@@ -27,13 +27,13 @@ export default {
   async execute(interaction: ChatInputCommandInteraction) {
     const guild = interaction.guild;
     if (!guild) {
-      await interaction.reply({ content: 'This command must be used within a guild.', ephermal: true });
+      await interaction.reply({ content: 'This command must be used within a guild.', ephemeral: true });
       return;
     }
     const adChannelId = Env.adChannelId;
     const channel = await interaction.client.channels.fetch(adChannelId).catch(() => null);
     if (!channel || !channel.isTextBased()) {
-      await interaction.reply({ content: 'The advertisement channel configured is invalid.', ephermal: true });
+      await interaction.reply({ content: 'The advertisement channel configured is invalid.', ephemeral: true });
       return;
     }
     const title = interaction.options.getString('title', true);
@@ -43,15 +43,17 @@ export default {
     const embed = createBrandEmbed(title, description);
     if (image) embed.setImage(image);
     try {
-      if (ping) {
-        await channel.send({ content: '@everyone', embeds: [embed] });
-      } else {
-        await channel.send({ embeds: [embed] });
+      if ('send' in channel) {
+        if (ping) {
+          await channel.send({ content: '@everyone', embeds: [embed] });
+        } else {
+          await channel.send({ embeds: [embed] });
+        }
       }
-      await interaction.reply({ content: 'Advertisement posted successfully!', ephermal: true });
+      await interaction.reply({ content: 'Advertisement posted successfully!', ephemeral: true });
     } catch (error) {
       console.error(error);
-      await interaction.reply({ content: 'Failed to send advertisement.', ephermal: true });
+      await interaction.reply({ content: 'Failed to send advertisement.', ephemeral: true });
     }
   },
 };

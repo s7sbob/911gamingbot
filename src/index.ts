@@ -1,5 +1,5 @@
 import { Client, Collection, GatewayIntentBits, Partials, Events, Interaction } from 'discord.js';
-import { readdirSync } from 'fs';
+import { readdirSync, statSync } from 'fs';
 import { join, resolve } from 'path';
 import mongoose from 'mongoose';
 
@@ -7,9 +7,6 @@ import { Env } from './config/env';
 import { Logger } from './utils/logger';
 import { MusicQueue } from './utils/musicQueue';
 
-// Create a new Discord client instance with required intents. Guilds intent
-// allows slash commands; GuildMembers is needed for role assignment; Voice
-// states are required for the music system.
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -20,7 +17,6 @@ const client = new Client({
   partials: [Partials.Channel],
 });
 
-// Extend client with a commands collection and music queue storage
 interface Command {
   data: any;
   execute: (interaction: Interaction) => Promise<any>;
@@ -28,41 +24,57 @@ interface Command {
 }
 
 (client as any).commands = new Collection<string, Command>();
-
-// Map of guildId to MusicQueue instance
 (client as any).musicQueues = new Map<string, MusicQueue>();
 
-// Load command modules
+// Load command modules recursively
 const commandsPath = join(__dirname, 'commands');
-const commandFolders = readdirSync(commandsPath);
-for (const folder of commandFolders) {
-  const folderPath = join(commandsPath, folder);
-  const files = readdirSync(folderPath).filter((file) => file.endsWith('.js') || file.endsWith('.ts'));
-  for (const file of files) {
-    const filePath = join(folderPath, file);
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const command = require(filePath).default;
-    if (command && command.data && command.execute) {
-      (client as any).commands.set(command.data.name, command);
-    } else {
-      console.warn(`The command at ${filePath} is missing required properties.`);
+
+function loadCommands(dir: string) {
+  const entries = readdirSync(dir);
+  
+  for (const entry of entries) {
+    const fullPath = join(dir, entry);
+    const stat = statSync(fullPath);
+    
+    if (stat.isDirectory()) {
+      // Recursively load commands from subdirectories
+      loadCommands(fullPath);
+    } else if (stat.isFile() && (entry.endsWith('.js') || entry.endsWith('.ts'))) {
+      // Load command file
+      try {
+        const command = require(fullPath).default;
+        if (command && command.data && command.execute) {
+          (client as any).commands.set(command.data.name, command);
+          console.log(`✓ Loaded command: ${command.data.name}`);
+        } else {
+          console.warn(`⚠ The command at ${fullPath} is missing required properties.`);
+        }
+      } catch (error) {
+        console.error(`✗ Failed to load command at ${fullPath}:`, error);
+      }
     }
   }
 }
+
+loadCommands(commandsPath);
 
 // Load event modules
 const eventsPath = join(__dirname, 'events');
 const eventFiles = readdirSync(eventsPath).filter((file) => file.endsWith('.js') || file.endsWith('.ts'));
 for (const file of eventFiles) {
   const filePath = join(eventsPath, file);
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const event = require(filePath).default;
-  if (event && event.name) {
-    if (event.once) {
-      client.once(event.name, (...args: any[]) => event.execute(...args, client));
-    } else {
-      client.on(event.name, (...args: any[]) => event.execute(...args, client));
+  try {
+    const event = require(filePath).default;
+    if (event && event.name) {
+      if (event.once) {
+        client.once(event.name, (...args: any[]) => event.execute(...args, client));
+      } else {
+        client.on(event.name, (...args: any[]) => event.execute(...args, client));
+      }
+      console.log(`✓ Loaded event: ${event.name}`);
     }
+  } catch (error) {
+    console.error(`✗ Failed to load event at ${filePath}:`, error);
   }
 }
 
@@ -72,14 +84,28 @@ async function connectDatabase(): Promise<void> {
   if (uri) {
     try {
       await mongoose.connect(uri);
-      console.log('Connected to MongoDB');
+      console.log('✓ Connected to MongoDB');
     } catch (error) {
-      console.error('MongoDB connection error:', error);
+      console.error('✗ MongoDB connection error:', error);
     }
   } else {
-    console.log('MONGODB_URI not provided. Using in-memory storage where applicable.');
+    console.log('ℹ MONGODB_URI not provided. Using in-memory storage where applicable.');
   }
 }
+
+// Set bot avatar on ready
+client.once(Events.ClientReady, async (c) => {
+  console.log(`✓ Ready! Logged in as ${c.user.tag}`);
+  
+  if (Env.botAvatarUrl) {
+    try {
+      await c.user.setAvatar(Env.botAvatarUrl);
+      console.log('✓ Bot avatar updated');
+    } catch (error) {
+      console.error('✗ Failed to set avatar:', error);
+    }
+  }
+});
 
 // Login to Discord
 async function start() {
@@ -88,5 +114,5 @@ async function start() {
 }
 
 start().catch((error) => {
-  console.error('Failed to start bot:', error);
+  console.error('✗ Failed to start bot:', error);
 });

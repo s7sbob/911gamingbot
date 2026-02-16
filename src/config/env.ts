@@ -26,6 +26,11 @@ export class Env {
     return process.env.BOT_AVATAR_URL || undefined;
   }
 
+  /** URL used to set the bot avatar on startup (alias for consistency) */
+  static get botAvatarUrl(): string | undefined {
+    return process.env.BOT_AVATAR_URL || undefined;
+  }
+
   /** Verification role assigned on button click */
   static get verificationRoleId(): string {
     const id = process.env.VERIFICATION_ROLE_ID;

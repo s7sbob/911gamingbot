@@ -97,38 +97,63 @@ export default {
           return;
         }
         if (action === 'publish') {
-          // Present a dropdown menu listing available channels where announcements can be posted.
           const guild = interaction.guild;
           if (!guild) {
             await interaction.reply({ content: 'لا يمكن العثور على الخادم.', flags: 64 });
             return;
           }
-          // Collect channels that support text-based messages (GuildText or GuildAnnouncement) and are viewable by the user
+          // Collect eligible channels: text or announcement channels with send capability
           const channels = guild.channels.cache.filter((c) => {
             return (
               (c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement) &&
               typeof (c as any).send === 'function'
             );
           });
-          const options = [] as any[];
-          // Limit to the first 25 channels (Discord select menus cannot exceed 25 options)
-          for (const channel of channels.values()) {
-            if (options.length >= 25) break;
-            options.push({
-              label: `#${channel.name}`,
-              value: channel.id,
-            });
-          }
-          if (options.length === 0) {
+          const channelArray = Array.from(channels.values());
+          if (channelArray.length === 0) {
             await interaction.reply({ content: 'لا توجد قنوات نصية متاحة لنشر الإعلان.', flags: 64 });
             return;
           }
-          const selectMenu = new StringSelectMenuBuilder()
-            .setCustomId(`announce-select-${messageId}-${authorId}`)
-            .setPlaceholder('اختر القناة لنشر الإعلان')
-            .addOptions(options);
-          const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
-          await interaction.reply({ content: 'اختر القناة التى تريد نشر الإعلان فيها:', components: [row], flags: 64 });
+          // Helper to build a paginated response with select menu and navigation buttons
+          const buildPageComponents = (page: number) => {
+            const MAX_OPTIONS = 25;
+            const totalPages = Math.ceil(channelArray.length / MAX_OPTIONS);
+            // Clamp page within bounds
+            const currentPage = Math.max(0, Math.min(page, totalPages - 1));
+            const start = currentPage * MAX_OPTIONS;
+            const end = start + MAX_OPTIONS;
+            const pageChannels = channelArray.slice(start, end);
+            const menuOptions = pageChannels.map((ch) => ({
+              label: `#${ch.name}`,
+              value: ch.id,
+            }));
+            const selectMenu = new StringSelectMenuBuilder()
+              .setCustomId(`announce-select-${messageId}-${authorId}`)
+              .setPlaceholder('اختر القناة لنشر الإعلان')
+              .addOptions(menuOptions);
+            const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+            // Navigation buttons
+            const navRow = new ActionRowBuilder<ButtonBuilder>();
+            const prevButton = new ButtonBuilder()
+              .setCustomId(`announce-page-prev-${messageId}-${authorId}-${currentPage}`)
+              .setLabel('السابق')
+              .setStyle(ButtonStyle.Secondary)
+              .setDisabled(currentPage === 0);
+            const nextButton = new ButtonBuilder()
+              .setCustomId(`announce-page-next-${messageId}-${authorId}-${currentPage}`)
+              .setLabel('التالى')
+              .setStyle(ButtonStyle.Secondary)
+              .setDisabled(currentPage >= totalPages - 1);
+            navRow.addComponents(prevButton, nextButton);
+            return { selectRow, navRow };
+          };
+          // Build components for the first page (0)
+          const { selectRow, navRow } = buildPageComponents(0);
+          await interaction.reply({
+            content: 'اختر القناة التى تريد نشر الإعلان فيها:',
+            components: [selectRow, navRow],
+            flags: 64,
+          });
         } else if (action === 'cancel') {
           await interaction.reply({ content: 'تم إلغاء نشر الإعلان.', flags: 64 });
         }
@@ -210,6 +235,79 @@ export default {
           console.error('Failed to post announcement:', err);
           await interaction.reply({ content: 'حدث خطأ أثناء نشر الإعلان.', flags: 64 });
         }
+        return;
+      }
+    }
+
+    // Handle pagination buttons for the announcement channel selection
+    if (interaction.isButton()) {
+      const customId = interaction.customId;
+      if (customId.startsWith('announce-page-')) {
+        const parts = customId.split('-');
+        // Expected format: announce-page-(prev|next)-messageId-userId-currentPage
+        const direction = parts[2];
+        const messageId = parts[3];
+        const authorId = parts[4];
+        const currentPage = parseInt(parts[5], 10);
+        if (!messageId || !authorId || Number.isNaN(currentPage)) {
+          await interaction.reply({ content: 'المعرف غير صالح.', flags: 64 });
+          return;
+        }
+        // Ensure only the original author can interact
+        if (interaction.user.id !== authorId) {
+          await interaction.reply({ content: 'غير مسموح لك بتنفيذ هذا الإجراء.', flags: 64 });
+          return;
+        }
+        const guild = interaction.guild;
+        if (!guild) {
+          await interaction.reply({ content: 'حدث خطأ فى الخادم.', flags: 64 });
+          return;
+        }
+        // Collect eligible channels again on demand
+        const channels = guild.channels.cache.filter((c) => {
+          return (
+            (c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement) &&
+            typeof (c as any).send === 'function'
+          );
+        });
+        const channelArray = Array.from(channels.values());
+        const MAX_OPTIONS = 25;
+        const totalPages = Math.ceil(channelArray.length / MAX_OPTIONS);
+        // Determine new page index
+        let newPage = currentPage;
+        if (direction === 'next') {
+          newPage = Math.min(currentPage + 1, totalPages - 1);
+        } else if (direction === 'prev') {
+          newPage = Math.max(currentPage - 1, 0);
+        }
+        const start = newPage * MAX_OPTIONS;
+        const end = start + MAX_OPTIONS;
+        const pageChannels = channelArray.slice(start, end);
+        const menuOptions = pageChannels.map((ch) => ({
+          label: `#${ch.name}`,
+          value: ch.id,
+        }));
+        const selectMenu = new StringSelectMenuBuilder()
+          .setCustomId(`announce-select-${messageId}-${authorId}`)
+          .setPlaceholder('اختر القناة لنشر الإعلان')
+          .addOptions(menuOptions);
+        const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+        const prevButton = new ButtonBuilder()
+          .setCustomId(`announce-page-prev-${messageId}-${authorId}-${newPage}`)
+          .setLabel('السابق')
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(newPage === 0);
+        const nextButton = new ButtonBuilder()
+          .setCustomId(`announce-page-next-${messageId}-${authorId}-${newPage}`)
+          .setLabel('التالى')
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(newPage >= totalPages - 1);
+        const navRow = new ActionRowBuilder<ButtonBuilder>().addComponents(prevButton, nextButton);
+        // Update the existing selection prompt message
+        await interaction.update({
+          content: 'اختر القناة التى تريد نشر الإعلان فيها:',
+          components: [selectRow, navRow],
+        });
         return;
       }
     }

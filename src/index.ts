@@ -13,7 +13,10 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,   // ← أضف هذا السطر
+    // Needed to read message content including emojis and mentions
+    GatewayIntentBits.MessageContent,
+    // Needed to access emoji and sticker data on messages
+    GatewayIntentBits.GuildEmojisAndStickers,
   ],
   partials: [Partials.Channel],
 });

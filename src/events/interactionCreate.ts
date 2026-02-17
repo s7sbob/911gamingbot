@@ -218,8 +218,26 @@ export default {
             }
           }
           if (files.length > 0) payload.files = files;
+          // Include sticker IDs if the original message contains stickers. Only up to 3 stickers are allowed per message.
+          try {
+            const stickersCollection: any = (originalMessage as any).stickers;
+            if (stickersCollection && Array.isArray(stickersCollection) ? stickersCollection.length > 0 : stickersCollection?.size > 0) {
+              // Normalise to array of IDs regardless of collection shape
+              const stickerArray = Array.isArray(stickersCollection)
+                ? stickersCollection
+                : Array.from(stickersCollection.values());
+              const stickerIds = stickerArray
+                .map((s: any) => (typeof s === 'string' ? s : s.id))
+                .filter((id: any): id is string => typeof id === 'string');
+              if (stickerIds.length > 0) {
+                payload.sticker_ids = stickerIds.slice(0, 3);
+              }
+            }
+          } catch (err) {
+            // silently ignore sticker parsing issues
+          }
           // Skip if there is nothing to send
-          if (!payload.content && !payload.embeds && files.length === 0) {
+          if (!payload.content && !payload.embeds && files.length === 0 && !('sticker_ids' in payload)) {
             await interaction.reply({ content: 'لا يمكن إرسال رسالة فارغة.', flags: 64 });
             return;
           }
